@@ -4,7 +4,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver import Keys, ActionChains
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from tempfile import NamedTemporaryFile
@@ -15,13 +15,13 @@ import shutil
 service = Service(executable_path="C:\\Users\\Trav\\Downloads\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe")
 options = webdriver.ChromeOptions()
 filename = 'C:\\Users\\Trav\\Downloads\\Fulfilmment Center Tracking.csv'
-fields = ['Supplier ID', 'Supplier Name', 'Doing Buisiness As', 'Registration Status', 'Reg Sort', 'Location Count', 'Chico Location', 'Fresno Location', 'Bakersfield', 'FCs Added', 'Workflow']
+fields = ['Supplier ID', 'Supplier Name', 'Doing Buisiness As', 'Registration Status', 'OFAC SDN Status', 'Reg Sort', 'Location Count', 'Chico Location', 'Fresno Location', 'Bakersfield', 'FCs Added']
 tempfile = NamedTemporaryFile(mode='w', delete=False)
 csubuy = webdriver.Chrome(service=service, options=options)
 csubuy.implicitly_wait(10)
 csubuy.get('https://solutions.sciquest.com/apps/Router/Login?OrgName=CalStateUniv&URL=')
 
-#Generic search for save button
+# Generic search for save button
 def save():
     saving = csubuy.find_elements(By.TAG_NAME, "input")
     for element in saving:
@@ -36,7 +36,7 @@ def smolsave():
     savebutton = buframe.find_element(By.XPATH, ".//input[@value='Save']")
     savebutton.click()
 
-#Generic search for close button        
+# Generic search for close button        
 def close():
     close = csubuy.find_elements(By.CLASS_NAME, "ButtonReq")
     for element in close:
@@ -51,7 +51,7 @@ def smolclose():
         closebutton = buframe.find_element(By.XPATH, ".//input[@value='Close']")
         closebutton.click()
 
-#Login to CSU BUY
+# Login to CSU BUY
 def authy():
     #Username input
     username = csubuy.find_element(By.ID, "Username")
@@ -67,7 +67,7 @@ def authy():
     login = csubuy.find_element(By.XPATH, "//button[@type='submit']")
     login.click()
 
-#One time function to navigate to supplier directory
+# One time function to navigate to supplier directory
 def prime():
     supplierbutton = csubuy.find_element(By.ID, "PHX_NAV_SupplierManagement_Img")
     ActionChains(csubuy).move_to_element(supplierbutton).perform()
@@ -77,30 +77,18 @@ def prime():
     suppliersearch = csubuy.find_element(By.ID, "PHX_NAV_TSMSearchForSupplier_Item").click()
     searchready = csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
 
-#Search for Supplier, select the "Manage" button, and then navigate into the general details area
+# Search for Supplier, select the "Manage" button, and then navigate into the general details area
 def search(supplierid, suppliername):
     leanname = suppliername.replace(" ", "")
     csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
     ActionChains(csubuy).send_keys(str(supplierid)).perform()
     assert csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch").get_attribute('value') == supplierid
-    searchbutton = csubuy.find_element(By.ID, "Button_Go").click()
+    csubuy.find_element(By.ID, "Button_Go").click()
     results = csubuy.find_element(By.XPATH, f"//a[starts-with(@id, '{leanname}')]")
     results.click()
 
-def readiness_update():
-    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
-    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
-    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "CMMSP_HeaderSupplierActions")))
-    current_step = csubuy.find_element(By.CSS_SELECTOR, ".WfStepBox.CurrentWfStep")
-    try:
-        current_step.find_element(By.XPATH, ".//a[@aria-label='Hold']")
-        return True
-    except NoSuchElementException:
-        returntosearch()
-        return False
-        
 #Check if the About > General button is visible & selectable. If not, check if it's nested inside the "About" group. If not, return to search screen.
-def classupdate():
+def class_update():
     print("Attempting to access supplier classification field within general area.")
     try:
         general_link = csubuy.find_element(By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_CorporateInfo")
@@ -108,7 +96,7 @@ def classupdate():
         general_link.click()
         supplier_type()
     except NoSuchElementException:
-        print('unable to locate general link. Checking if it\'s nested inside the "About" group.')
+        print('Unable to locate general link. Checking if it is nested inside the "About" group.')
         about = csubuy.find_element(By.ID, 'PHX_NAV_SupplierProfile')
         about.click()
         WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_CorporateInfo"))).click()
@@ -126,36 +114,30 @@ def supplier_type():
         save()
         print("Supplier classification update complete.")
 
-#Create fulfillment centers for Chico and Fresno
-    #Logic statement:
-    #If Chico = Yes and Fresno = Yes, create both (three) fulfillment centers
-    #If Chico = Yes and Fresno = No, create Chico fulfillment center
-    #If Chico = No and Fresno = Yes, create Fresno fulfillment centers (two)
-    #If Chico = No and Fresno = No, do nothing
-    #if fulfillment centers already exists, check if Chico/Freso are already marked primary. If so, do nothing.
 
+# Create fulfillment centers for Chico and Fresno
 def fcenter(chico, fresno):
-    csubuy.find_element(By.ID, "PHX_NAV_ContactsAndLocations").click()
-    csubuy.find_element(By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_Fulfillment").click()
-    if fresno == "Yes":
+    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_ContactsAndLocations"))).click()
+    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_Fulfillment"))).click()
+    if fresno == "Yes": # begin logic to update and create fulfillment center for fresno & fresno athletics
         buedit()
         csubuy.switch_to.default_content()
         WebDriverWait(csubuy, 3).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ModalPopupIframe")))
-        #Check if the fresno fulfillment center is already enabled. If not, enable it.
-        frxno = csubuy.find_element(By.NAME, "FRXNO")
+        
+        frxno = csubuy.find_element(By.NAME, "FRXNO") #Check if the fresno fulfillment center is already enabled. If not, enable it.
         if frxno.is_selected() == False:
             frxno.click()
-        #Pause for the preferred checkbox to appear. if the fresno fulfillment center is already enabled as primary, ignore. If not, enable it as primary.
-        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.NAME, "FRXNO_IsPreferred")))
+        
+        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.NAME, "FRXNO_IsPreferred"))) #Pause for the preferred checkbox to appear. if the fresno fulfillment center is already enabled as primary, ignore. If not, enable it as primary.
         frxpf = csubuy.find_element(By.NAME, "FRXNO_IsPreferred")
         if frxpf.is_selected() == False:
             frxpf.click()
-        #Save & close dialogues and then move over to custom data section of fulfillment center
+            
         smolsave()
         smolclose()
         csubuy.switch_to.default_content()
         customdata()
-        fc_create()
+        fc_create() # Create a new FC
         buedit()
         csubuy.switch_to.default_content()
         WebDriverWait(csubuy, 3).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ModalPopupIframe")))
@@ -166,11 +148,11 @@ def fcenter(chico, fresno):
         smolclose()
         csubuy.switch_to.default_content()
         customdata()
-    if chico == "Yes" and fresno == "Yes":
+    if chico == "Yes" and fresno == "Yes": # If both chico and fresno are enabled, then create a new FC for chico
         fc_create()
-        time.sleep(1)
-    elif chico == "Yes" and fresno == "No":
+    elif chico == "Yes" and fresno == "No": # If only chico is enabled, then create a new FC for chico. This is primarily done this way to ignore the scenario of only fresno being enabled.
         buedit()
+        
         WebDriverWait(csubuy, 3).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "ModalPopupIframe")))
         assignments = csubuy.find_elements(By.TAG_NAME, 'input')
         for element in assignments:
@@ -178,13 +160,13 @@ def fcenter(chico, fresno):
                 csubuy.execute_script("arguments[0].scrollIntoView();", element)
                 if element.is_selected() == False:
                     element.click()
-                time.sleep(1)
                 break
-        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.NAME, "CHXCO_IsPreferred")))
+            
+        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.NAME, "CHXCO_IsPreferred"))) # Pause for the preferred checkbox to appear. If the chico fulfillment center is already enabled as primary, ignore. If not, enable it as primary.
         chxpr = csubuy.find_element(By.NAME, "CHXCO_IsPreferred")
         if chxpr.is_selected() == False:
             chxpr.click()
-        time.sleep(2)
+        
         smolsave()
         smolclose()
         csubuy.switch_to.default_content()
@@ -207,20 +189,17 @@ def customdata():
             csubuy.execute_script("arguments[0].scrollIntoView();", element)
             element.click()
             break
-    time.sleep(2)
     paygroup = csubuy.find_element(By.ID, "UDF_12841")
     paygroup_value = Select(paygroup)
     paygroup_value.select_by_visible_text("RE_Regular")
     handling = csubuy.find_element(By.ID, "UDF_12861")
     handling_value = Select(handling)
     handling_value.select_by_visible_text("RE_Regular")
-    time.sleep(2)
     save()
-    time.sleep(2)
 
 #Create additional fulfillment center
 def fc_create():
-    newfc = csubuy.find_element(By.ID, "CmmSP_NewFulfillmentCenter").click()
+    csubuy.find_element(By.ID, "CmmSP_NewFulfillmentCenter").click()
 
 #First, check supplier workflow status. If it is "Profile Complete", then proceed to workflow screen. If it is not "Profile Complete", then do nothing.
 #If current workflow step = 3, then do nothing. If current workflow step = 2, then inspect supplier actions
@@ -244,42 +223,42 @@ def approve():
     
 #Return to search screen
 def returntosearch():
-    csubuy.find_element(By.ID, "Back_To_Results_Search").click()
-    csubuy.find_element(By.ID, "GSP_Suppliers_Search_NewSearch").click()
+    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "Back_To_Results_Search"))).click()
+    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
+    return
 
 authy()
 prime()
-task_complete = "Yes"
-updated_row = []
-with open(filename, 'r') as csvfile, tempfile:
+with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
     supplierdata = csv.DictReader(csvfile, fieldnames=fields)
     writer = csv.DictWriter(tempfile, fieldnames=fields)
     for row in supplierdata:
-        print("Beginning search for suppplier: " + row['Supplier Name'])
-        if row['Registration Status'] == "Profile Complete" and row['FCs Added'] == "No":
+        print("Beginning search for supppier: " + row['Supplier Name'])
+        if row['Registration Status'] == "Profile Complete" and row['OFAC SDN Status'] == "Check Not Run" and row['FCs Added'] == "No":
             print("Supplier: " + row['Supplier Name'] + " is in scope and assessing information.")
             search(row['Supplier ID'], row['Supplier Name'])            
-            if readiness_update() == True:
-                print("Supplier: " + row['Supplier Name'] + " is still in hold status. Proceeding with instruction.")
-                classupdate()
-                print("Updated classification for :" + row['Supplier Name'])
-                fcenter(row['Chico Location'], row['Fresno Location'])
-                print("Created fulfillment centers for: " + row['Supplier Name'])
-                row['Workflow'] = approve()
-                print("Approved the registration workflow step for: " + row['Supplier Name'])
-                newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "Yes", 'Workflow': row['Workflow']}
-                writer.writerow(newrow)
-                print("Updated CSV with progress for: " + row['Supplier Name'])
-            else:
-                print("Supplier: " + row['Supplier Name'] + " is not in hold status. Skipping to next supplier.")
-                newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No", 'Workflow': "Workflow Step Already Completed"}
-                writer.writerow(newrow)
-                print("Updated CSV with progress for: " + row['Supplier Name'])
+            class_update()
+            print("Updated classification for :" + row['Supplier Name'])
+            fcenter(row['Chico Location'], row['Fresno Location'])
+            print("Created fulfillment centers for: " + row['Supplier Name'])
+            row['Workflow'] = approve()
+            print("Approved the registration workflow step for: " + row['Supplier Name'])
+            newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "Yes"}
+            writer.writerow(newrow)
+            print("Updated CSV with progress for: " + row['Supplier Name'])
+            
+            # Save the updated csv immediately
+            tempfile.flush()
+            shutil.move(tempfile.name, filename)
+            
         else:
-            newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No", 'Workflow': "Not Applicable"}
+            newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
             writer.writerow(newrow)
             print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
+    
+    # Save the final csv before finishing
+    tempfile.flush()
+    shutil.move(tempfile.name, filename)
 
-shutil.move(tempfile.name, filename)
 csubuy.close()
 csubuy.quit()
