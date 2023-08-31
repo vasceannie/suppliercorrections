@@ -21,35 +21,39 @@ csubuy = webdriver.Chrome(service=service, options=options)
 csubuy.implicitly_wait(7)
 csubuy.get('https://solutions.sciquest.com/apps/Router/Login?OrgName=CalStateUniv&URL=')
 
-# Generic search for save button
-def save():
-    saving = csubuy.find_elements(By.TAG_NAME, "input")
-    for element in saving:
-        if element.get_attribute("value") == "Save":
-            csubuy.execute_script("arguments[0].scrollIntoView();", element)
-            element.click()
-            break
+# Function to look for the save button & select it. This is used for the general save button and the small save button within frames.
+def save(type):
+    if type == "generic":
+        saving = csubuy.find_elements(By.TAG_NAME, "input")
+        for element in saving:
+            if element.get_attribute("value") == "Save":
+                csubuy.execute_script("arguments[0].scrollIntoView();", element)
+                element.click()
+                break
+            return
+    elif type == "small":
+        csubuy.switch_to.default_content()
+        buframe = csubuy.find_element(By.XPATH, "//div[@id='ModalPopupIframeSave']")
+        savebutton = buframe.find_element(By.XPATH, ".//input[@value='Save']")
+        savebutton.click()
+        return
 
-def smolsave():
-    csubuy.switch_to.default_content()
-    buframe = csubuy.find_element(By.XPATH, "//div[@id='ModalPopupIframeSave']")
-    savebutton = buframe.find_element(By.XPATH, ".//input[@value='Save']")
-    savebutton.click()
-
-# Generic search for close button        
-def close():
-    close = csubuy.find_elements(By.CLASS_NAME, "ButtonReq")
-    for element in close:
-        if element.get_attribute("value") == "Close":
-            csubuy.execute_script("arguments[0].scrollIntoView();", element)
-            element.click()
-            break
-        
-def smolclose():
+# Function to look for the close button & select it. This is used for the general close button and close buttons within frames.      
+def close(type):
+    if type == "generic":
+        close = csubuy.find_elements(By.CLASS_NAME, "ButtonReq")
+        for element in close:
+            if element.get_attribute("value") == "Close":
+                csubuy.execute_script("arguments[0].scrollIntoView();", element)
+                element.click()
+                break
+            return
+    elif type == "small":
         csubuy.switch_to.default_content()
         buframe = csubuy.find_element(By.XPATH, "//div[@id='ModalPopupIframeSave']")
         closebutton = buframe.find_element(By.XPATH, ".//input[@value='Close']")
         closebutton.click()
+        return
 
 # Login to CSU BUY
 def authy():
@@ -66,44 +70,31 @@ def authy():
     #Interact with login button
     login = csubuy.find_element(By.XPATH, "//button[@type='submit']")
     login.click()
-
-# One time function to navigate to supplier directory
-def prime():
+    
+    # Move to the supplier directory after logging in.
     supplierbutton = csubuy.find_element(By.ID, "PHX_NAV_SupplierManagement_Img")
     ActionChains(csubuy).move_to_element(supplierbutton).perform()
     assert csubuy.find_element(By.ID, "PHX_NAV_SupplierManagement_Img").is_displayed()
     while not csubuy.find_element(By.ID, "PHX_NAV_TSMSearchForSupplier_Item").is_displayed():
         WebDriverWait(csubuy, 1).until(lambda csubuy: csubuy.find_element(By.ID, "PHX_NAV_TSMSearchForSupplier_Item"))
-    suppliersearch = csubuy.find_element(By.ID, "PHX_NAV_TSMSearchForSupplier_Item").click()
-    searchready = csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
+    csubuy.find_element(By.ID, "PHX_NAV_TSMSearchForSupplier_Item").click()
+    csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
 
 # Search for Supplier, select the "Manage" button, and then navigate into the general details area
 def search(supplierid, suppliername):
     leanname = suppliername.replace(" ", "")
-    time.sleep(1)
     csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
     ActionChains(csubuy).send_keys(str(supplierid)).perform()
     assert csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch").get_attribute('value') == supplierid
     csubuy.find_element(By.ID, "Button_Go").click()
     time.sleep(1)
-    query = csubuy.find_elements(By.TAG_NAME, "a")
-    results = None
-    try:
-        for result in query:
-            if 'ViewSupplierProfile' in result.get_attribute("href"):
-                results = result
+    query = csubuy.find_element(By.CLASS_NAME, "SearchResults")
+    results = query.find_elements(By.XPATH, "//a[contains(@id, '_Link')]")
+    for link in results:
+        if 'SupplierID=' in link.get_attribute("href"):
+            link.click()
             break
-    
-        if results is not None:
-            results.click()
-            return
-        else:
-            return
-
-    except NoSuchElementException:
-        result = query.find_element(By.XPATH, f"//a[starts-with(@id, '{leanname}')]")
-        result.click()
-        return
+    return
 
 # preliminary check to see if the supplier is still in holding status.
 def check_status():
@@ -111,7 +102,7 @@ def check_status():
         print("Attempting to access supplier workflow page")
         WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
         WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
-        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "docWorkflowCheckBox")))
+        time.sleep(2)
         current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
         wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
         if wf_step == "Hold":
@@ -162,7 +153,7 @@ def supplier_type():
         supplier_classification = csubuy.find_element(By.ID, "RegElement_18131_43")
         classification_value = Select(supplier_classification)
         classification_value.select_by_visible_text("Supplier")
-        save()
+        save("generic")
         print("Supplier classification update complete.")
 
 # Create fulfillment centers for Chico and Fresno
@@ -183,8 +174,8 @@ def fcenter(chico, fresno):
         if frxpf.is_selected() == False:
             frxpf.click()
             
-        smolsave()
-        smolclose()
+        save("small")
+        close("small")
         csubuy.switch_to.default_content()
         customdata()
         fc_create() # Create a new FC
@@ -194,8 +185,8 @@ def fcenter(chico, fresno):
         frxth = csubuy.find_element(By.NAME, "FRXTH")
         if frxth.is_selected() == False:
             frxth.click()
-        smolsave()
-        smolclose()
+        save("small")
+        close("small")
         csubuy.switch_to.default_content()
         customdata()
     if chico == "Yes" and fresno == "Yes": # If both chico and fresno are enabled, then create a new FC for chico
@@ -217,8 +208,8 @@ def fcenter(chico, fresno):
         if chxpr.is_selected() == False:
             chxpr.click()
         
-        smolsave()
-        smolclose()
+        save("small")
+        close("small")
         csubuy.switch_to.default_content()
         customdata()
 
@@ -245,7 +236,7 @@ def customdata():
     handling = csubuy.find_element(By.ID, "UDF_12861")
     handling_value = Select(handling)
     handling_value.select_by_visible_text("RE_Regular")
-    save()
+    save("generic")
 
 #Create additional fulfillment center
 def fc_create():
@@ -283,7 +274,6 @@ def returntosearch():
         return
 
 authy()
-prime()
 with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
     supplierdata = csv.DictReader(csvfile, fieldnames=fields)
     writer = csv.DictWriter(tempfile, fieldnames=fields)
