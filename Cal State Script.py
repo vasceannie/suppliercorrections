@@ -18,7 +18,7 @@ filename = 'C:\\Users\\Trav\\Downloads\\Fulfilmment Center Tracking.csv'
 fields = ['Supplier ID', 'Supplier Name', 'Doing Buisiness As', 'Registration Status', 'OFAC SDN Status', 'Reg Sort', 'Location Count', 'Chico Location', 'Fresno Location', 'Bakersfield', 'FCs Added']
 tempfile = NamedTemporaryFile(mode='w', delete=False)
 csubuy = webdriver.Chrome(service=service, options=options)
-csubuy.implicitly_wait(7)
+csubuy.implicitly_wait(1)
 csubuy.get('https://solutions.sciquest.com/apps/Router/Login?OrgName=CalStateUniv&URL=')
 
 # Function to look for the save button & select it. This is used for the general save button and the small save button within frames.
@@ -103,7 +103,7 @@ def check_status():
     WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
     try:
         print("Checking to see if the supplier current workflow step is in holding status.")
-        time.sleep(2)
+        time.sleep(1)
         current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
         wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
         if wf_step == "Hold":
@@ -111,16 +111,12 @@ def check_status():
             return True
     except NoSuchElementException:
         print("I couldn't find a current workflow step. Let's make sure the supplier status isn't approved or the workflow is already complete.")
-        supplier_statuses = csubuy.find_elements(By.CLASS_NAME, "phx data-row-content")
-        for status in supplier_statuses:
-            if status.text == "Approved":
-                print("Supplier is no longer in holding status. Let's move on.")
-                returntosearch()
-                return False
-        return False
+        approval_state = csubuy.find_element(By.XPATH, '//*[@id="SupplierRegistrationApprovals_body"]/div[6]/div[2]/div/div/div[1]/form/div/div[2]/div/div[2]/div[2]/div')
+        if approval_state.text == "Approved":
+            print("Supplier is already approved. Let's move on.")
+            return False
     except:
         print("Something is wrong. Unable to access supplier workflow page. Let's move on")
-        returntosearch()
         return False
                 
 #Check if the About > General button is visible & selectable. If not, check if it's nested inside the "About" group. If not, return to search screen.
@@ -259,9 +255,10 @@ def returntosearch():
     try:
         links = csubuy.find_elements(By.CLASS_NAME, "linkText")
         for link in links:
-            if link.text == "Back to Search":
+            if link.text == "Back to Results":
                 link.click()
                 break
+        WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
         return
     except NoSuchElementException:
         print("The return to search button isn't where it should be, going through the breadcrumb.")
