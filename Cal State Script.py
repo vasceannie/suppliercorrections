@@ -18,7 +18,7 @@ filename = 'C:\\Users\\Trav\\Downloads\\Fulfilmment Center Tracking.csv'
 fields = ['Supplier ID', 'Supplier Name', 'Doing Buisiness As', 'Registration Status', 'OFAC SDN Status', 'Reg Sort', 'Location Count', 'Chico Location', 'Fresno Location', 'Bakersfield', 'FCs Added']
 tempfile = NamedTemporaryFile(mode='w', delete=False)
 csubuy = webdriver.Chrome(service=service, options=options)
-csubuy.implicitly_wait(10)
+csubuy.implicitly_wait(7)
 csubuy.get('https://solutions.sciquest.com/apps/Router/Login?OrgName=CalStateUniv&URL=')
 
 # Generic search for save button
@@ -118,7 +118,6 @@ def check_status():
         print("Something is wrong. Unable to access supplier workflow page. Let's move on")
         returntosearch()
         return False
-
                 
 #Check if the About > General button is visible & selectable. If not, check if it's nested inside the "About" group. If not, return to search screen.
 def class_update():
@@ -146,7 +145,6 @@ def supplier_type():
         classification_value.select_by_visible_text("Supplier")
         save()
         print("Supplier classification update complete.")
-
 
 # Create fulfillment centers for Chico and Fresno
 def fcenter(chico, fresno):
@@ -234,9 +232,6 @@ def customdata():
 def fc_create():
     csubuy.find_element(By.ID, "CmmSP_NewFulfillmentCenter").click()
 
-#First, check supplier workflow status. If it is "Profile Complete", then proceed to workflow screen. If it is not "Profile Complete", then do nothing.
-#If current workflow step = 3, then do nothing. If current workflow step = 2, then inspect supplier actions
-#If "Approve/Complete Current Registration Workflow Step", do nothing and indicate in output. If "Approve/Complete Registration Workflow" is visible, then click and approve.
 #Approve workflow step
 def approve():
     WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
@@ -275,7 +270,7 @@ with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
         if row['Registration Status'] == "Profile Complete" and row['OFAC SDN Status'] == "Check Not Run" and row['FCs Added'] == "No":
             print("Supplier: " + row['Supplier Name'] + " is in scope and assessing information.")
             search(row['Supplier ID'], row['Supplier Name'])            
-            if check_status() == False:
+            if check_status() == True:
                 class_update()
                 print("Updated classification for :" + row['Supplier Name'])
                 fcenter(row['Chico Location'], row['Fresno Location'])
@@ -285,27 +280,22 @@ with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
                 newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "Yes"}
                 writer.writerow(newrow)
                 print("Updated CSV with progress for: " + row['Supplier Name'])
-            
-                # Save the updated csv immediately
-                tempfile.flush()
-                shutil.move(tempfile.name, filename)
-            
+
             else:
                 newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
                 writer.writerow(newrow)
                 print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
                 
-                # Save the final csv before finishing
-                tempfile.flush()
-                shutil.move(tempfile.name, filename)
         else:
             newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
             writer.writerow(newrow)
             print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
     
             # Save the final csv before finishing
-            tempfile.flush()
-            shutil.move(tempfile.name, filename)
+    tempfile.flush()
+    time.sleep(2)
+    tempfile.close()
+    shutil.move(tempfile.name, filename)
 
 csubuy.close()
 csubuy.quit()
