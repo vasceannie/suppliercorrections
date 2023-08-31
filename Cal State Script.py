@@ -80,12 +80,30 @@ def prime():
 # Search for Supplier, select the "Manage" button, and then navigate into the general details area
 def search(supplierid, suppliername):
     leanname = suppliername.replace(" ", "")
+    time.sleep(1)
     csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch")
     ActionChains(csubuy).send_keys(str(supplierid)).perform()
     assert csubuy.find_element(By.ID, "GSP_Suppliers_Search_Supplier_SimpleSearch").get_attribute('value') == supplierid
     csubuy.find_element(By.ID, "Button_Go").click()
-    results = csubuy.find_element(By.XPATH, f"//a[starts-with(@id, '{leanname}')]")
-    results.click()
+    time.sleep(1)
+    query = csubuy.find_elements(By.TAG_NAME, "a")
+    results = None
+    try:
+        for result in query:
+            if 'ViewSupplierProfile' in result.get_attribute("href"):
+                results = result
+            break
+    
+        if results is not None:
+            results.click()
+            return
+        else:
+            return
+
+    except NoSuchElementException:
+        result = query.find_element(By.XPATH, f"//a[starts-with(@id, '{leanname}')]")
+        result.click()
+        return
 
 # preliminary check to see if the supplier is still in holding status.
 def check_status():
@@ -94,7 +112,7 @@ def check_status():
         WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
         WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
         WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "docWorkflowCheckBox")))
-        current_step = csubuy.find_element(By.CLASS_NAME, "WfStepBox CurrentWfStep")
+        current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
         wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
         if wf_step == "Hold":
             print("Supplier is still in holding status. We will proceed.")
@@ -104,15 +122,16 @@ def check_status():
             return False
     except NoSuchElementException:
         print("Maybe the registration workflow link is nested in the Workflow & Review group. Checking again.")
-        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
+        # WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
         WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
-        current_step = csubuy.find_element(By.CLASS_NAME, "WfStepBox CurrentWfStep")
+        current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
         wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
         if wf_step == "Hold":
             print("Supplier is still in holding status. We will proceed.")
             return True
         else:
             print("This supplier doesn't seem to be primed. Let's move on.")
+            returntosearch()
             return False
     except:
         print("Something is wrong. Unable to access supplier workflow page. Let's move on")
@@ -252,13 +271,16 @@ def approve():
 #Return to search screen
 def returntosearch():
     try:
-        WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "Back_To_Results_Search"))).click()
+        csubuy.find_element(By.ID, "Back_To_Results_Search").click()
         WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
+        time.sleep(3)
+        return
     except NoSuchElementException:
         print("The return to search button isn't where it should be, going through the breadcrumb.")
         csubuy.find_element(By.ID, "Phoenix_BreadCrumb_PHX_NAV_TSMSearchForSupplier_Invoker").click()
         WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "bc_PHX_NAV_TSMSearchForSupplier_Item"))).click()
-    return
+        time.sleep(3)
+        return
 
 authy()
 prime()
@@ -266,7 +288,6 @@ with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
     supplierdata = csv.DictReader(csvfile, fieldnames=fields)
     writer = csv.DictWriter(tempfile, fieldnames=fields)
     for row in supplierdata:
-        print("Beginning search for supppier: " + row['Supplier Name'])
         if row['Registration Status'] == "Profile Complete" and row['OFAC SDN Status'] == "Check Not Run" and row['FCs Added'] == "No":
             print("Supplier: " + row['Supplier Name'] + " is in scope and assessing information.")
             search(row['Supplier ID'], row['Supplier Name'])            
@@ -282,20 +303,21 @@ with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
                 print("Updated CSV with progress for: " + row['Supplier Name'])
 
             else:
+                returntosearch()
                 newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
                 writer.writerow(newrow)
                 print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
-                
+        
         else:
             newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
             writer.writerow(newrow)
             print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
     
-            # Save the final csv before finishing
-    tempfile.flush()
-    time.sleep(2)
-    tempfile.close()
-    shutil.move(tempfile.name, filename)
+# Save the final csv before finishing
+tempfile.flush()
+time.sleep(2)
+tempfile.close()
+shutil.move(tempfile.name, filename)
 
 csubuy.close()
 csubuy.quit()
