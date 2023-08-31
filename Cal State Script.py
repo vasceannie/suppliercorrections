@@ -87,9 +87,42 @@ def search(supplierid, suppliername):
     results = csubuy.find_element(By.XPATH, f"//a[starts-with(@id, '{leanname}')]")
     results.click()
 
+# preliminary check to see if the supplier is still in holding status.
+def check_status():
+    try:
+        print("Attempting to access supplier workflow page")
+        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
+        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
+        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "docWorkflowCheckBox")))
+        current_step = csubuy.find_element(By.CLASS_NAME, "WfStepBox CurrentWfStep")
+        wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
+        if wf_step == "Hold":
+            print("Supplier is still in holding status. We will proceed.")
+            return True
+        else:
+            print("This supplier doesn't seem to be primed. Let's move on.")
+            return False
+    except NoSuchElementException:
+        print("Maybe the registration workflow link is nested in the Workflow & Review group. Checking again.")
+        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
+        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
+        current_step = csubuy.find_element(By.CLASS_NAME, "WfStepBox CurrentWfStep")
+        wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
+        if wf_step == "Hold":
+            print("Supplier is still in holding status. We will proceed.")
+            return True
+        else:
+            print("This supplier doesn't seem to be primed. Let's move on.")
+            return False
+    except:
+        print("Something is wrong. Unable to access supplier workflow page. Let's move on")
+        returntosearch()
+        return False
+
+                
 #Check if the About > General button is visible & selectable. If not, check if it's nested inside the "About" group. If not, return to search screen.
 def class_update():
-    print("Attempting to access supplier classification field within general area.")
+    print("Now beginning attempts to access supplier classification field within general area.")
     try:
         general_link = csubuy.find_element(By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_CorporateInfo")
         print("Located General. Moving forward with updating classification.")
@@ -103,7 +136,7 @@ def class_update():
         print("Located About. Moving forward with updating classification.")
         supplier_type()
     except:
-        print("Something is wrong")
+        print("Something is wrong. Let's move on.")
         returntosearch()
 
 #Function to update supplier classification to "Supplier"        
@@ -223,8 +256,13 @@ def approve():
     
 #Return to search screen
 def returntosearch():
-    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "Back_To_Results_Search"))).click()
-    WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
+    try:
+        WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "Back_To_Results_Search"))).click()
+        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
+    except NoSuchElementException:
+        print("The return to search button isn't where it should be, going through the breadcrumb.")
+        csubuy.find_element(By.ID, "Phoenix_BreadCrumb_PHX_NAV_TSMSearchForSupplier_Invoker").click()
+        WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "bc_PHX_NAV_TSMSearchForSupplier_Item"))).click()
     return
 
 authy()
@@ -237,28 +275,37 @@ with open(filename, 'r') as csvfile, open("temp.csv", 'w') as tempfile:
         if row['Registration Status'] == "Profile Complete" and row['OFAC SDN Status'] == "Check Not Run" and row['FCs Added'] == "No":
             print("Supplier: " + row['Supplier Name'] + " is in scope and assessing information.")
             search(row['Supplier ID'], row['Supplier Name'])            
-            class_update()
-            print("Updated classification for :" + row['Supplier Name'])
-            fcenter(row['Chico Location'], row['Fresno Location'])
-            print("Created fulfillment centers for: " + row['Supplier Name'])
-            row['Workflow'] = approve()
-            print("Approved the registration workflow step for: " + row['Supplier Name'])
-            newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "Yes"}
-            writer.writerow(newrow)
-            print("Updated CSV with progress for: " + row['Supplier Name'])
+            if check_status() == False:
+                class_update()
+                print("Updated classification for :" + row['Supplier Name'])
+                fcenter(row['Chico Location'], row['Fresno Location'])
+                print("Created fulfillment centers for: " + row['Supplier Name'])
+                row['Workflow'] = approve()
+                print("Approved the registration workflow step for: " + row['Supplier Name'])
+                newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "Yes"}
+                writer.writerow(newrow)
+                print("Updated CSV with progress for: " + row['Supplier Name'])
             
-            # Save the updated csv immediately
-            tempfile.flush()
-            shutil.move(tempfile.name, filename)
+                # Save the updated csv immediately
+                tempfile.flush()
+                shutil.move(tempfile.name, filename)
             
+            else:
+                newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
+                writer.writerow(newrow)
+                print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
+                
+                # Save the final csv before finishing
+                tempfile.flush()
+                shutil.move(tempfile.name, filename)
         else:
             newrow = {'Supplier ID': row['Supplier ID'], 'Supplier Name': row['Supplier Name'], 'Doing Buisiness As': row['Doing Buisiness As'], 'Registration Status': row['Registration Status'], 'OFAC SDN Status': row['OFAC SDN Status'], 'Reg Sort': row['Reg Sort'], 'Location Count': row['Location Count'], 'Chico Location': row['Chico Location'], 'Fresno Location': row['Fresno Location'],'Bakersfield': row['Bakersfield'], 'FCs Added': "No"}
             writer.writerow(newrow)
             print("Supplier: " + row['Supplier Name'] + " is not in scope for this project.")
     
-    # Save the final csv before finishing
-    tempfile.flush()
-    shutil.move(tempfile.name, filename)
+            # Save the final csv before finishing
+            tempfile.flush()
+            shutil.move(tempfile.name, filename)
 
 csubuy.close()
 csubuy.quit()
