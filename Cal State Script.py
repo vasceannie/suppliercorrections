@@ -98,32 +98,26 @@ def search(supplierid, suppliername):
 
 # preliminary check to see if the supplier is still in holding status.
 def check_status():
+    print("Attempting to access supplier workflow page")
+    WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
+    WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
     try:
-        print("Attempting to access supplier workflow page")
-        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
-        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
+        print("Checking to see if the supplier current workflow step is in holding status.")
         time.sleep(2)
         current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
         wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
         if wf_step == "Hold":
             print("Supplier is still in holding status. We will proceed.")
             return True
-        else:
-            print("This supplier doesn't seem to be primed. Let's move on.")
-            return False
     except NoSuchElementException:
-        print("Maybe the registration workflow link is nested in the Workflow & Review group. Checking again.")
-        # WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PHX_NAV_WORKFLOW_AND_REVIEW"))).click()
-        WebDriverWait(csubuy, 2).until(EC.element_to_be_clickable((By.ID, "PhoenixNavLink_PHX_NAV_SupplierProfile_RegistrationWorkflow"))).click()
-        current_step = csubuy.find_element(By.CLASS_NAME, "CurrentWfStep")
-        wf_step = current_step.find_element(By.CLASS_NAME, "WfStepName").text
-        if wf_step == "Hold":
-            print("Supplier is still in holding status. We will proceed.")
-            return True
-        else:
-            print("This supplier doesn't seem to be primed. Let's move on.")
-            returntosearch()
-            return False
+        print("I couldn't find a current workflow step. Let's make sure the supplier status isn't approved or the workflow is already complete.")
+        supplier_statuses = csubuy.find_elements(By.CLASS_NAME, "phx data-row-content")
+        for status in supplier_statuses:
+            if status.text == "Approved":
+                print("Supplier is no longer in holding status. Let's move on.")
+                returntosearch()
+                return False
+        return False
     except:
         print("Something is wrong. Unable to access supplier workflow page. Let's move on")
         returntosearch()
@@ -260,17 +254,20 @@ def approve():
     return "Workflow Step Completed"
     
 #Return to search screen
+#Return to search screen
 def returntosearch():
     try:
-        csubuy.find_element(By.ID, "Back_To_Results_Search").click()
-        WebDriverWait(csubuy, 3).until(EC.element_to_be_clickable((By.ID, "GSP_Suppliers_Search_NewSearch"))).click()
-        time.sleep(3)
+        links = csubuy.find_elements(By.CLASS_NAME, "linkText")
+        for link in links:
+            if link.text == "Back to Search":
+                link.click()
+                break
         return
     except NoSuchElementException:
         print("The return to search button isn't where it should be, going through the breadcrumb.")
         csubuy.find_element(By.ID, "Phoenix_BreadCrumb_PHX_NAV_TSMSearchForSupplier_Invoker").click()
         WebDriverWait(csubuy, 1).until(EC.element_to_be_clickable((By.ID, "bc_PHX_NAV_TSMSearchForSupplier_Item"))).click()
-        time.sleep(3)
+        time.sleep(1)
         return
 
 authy()
